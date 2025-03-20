@@ -3,46 +3,252 @@ module alchitry_top (
     input rst_n,            // reset button (active low)
     output led[8],          // 8 user controllable LEDs
     input usb_rx,           // USB->Serial input
-    output usb_tx,          // USB->Serial output
-    output io_led[3][8],    // LEDs on IO Shield
-    output io_segment[8],   // 7-segment LEDs on IO Shield
-    output io_select[4],    // Digit select on IO Shield
-    input io_button[5],     // 5 buttons on IO Shield
-    input io_dip[3][8]      // DIP switches on IO Shield
+    output usb_tx,           // USB->Serial output
+    output io_led[3][8],     // LEDs on IO Shield
+    output io_segment[8],        // 7-segment LEDs on IO Shield
+    output io_select[4],        // Digit select on IO Shield
+    input io_button[5],      // 5 buttons on IO Shield
+    input io_dip[3][8]       // DIP switches on IO Shield
 ) {
+    //setting up alu
+    alu alu
     
+    //function for 7seg
+    bin_to_dec in_state_renderer(#DIGITS(4), #LEADING_ZEROS(0))
+    //bin_to_dec err_renderer(#DIGITS(4), #LEADING_ZEROS(0))
+    
+    //setting up rom and checker
+    rom rom
+    truth_checker truth_checker
+    
+    //setting up states
+    enum InputStates {
+        A_UPPER,
+        A_LOWER,
+        B_UPPER,
+        B_LOWER
+    }
+    enum OutputStates {
+        OUT_LOWER,
+        OUT_UPPER
+    }
+    enum TestStates {
+        IDLE,
+        UPDATE,
+        START,
+        STOP,
+        END,
+        INCREMENT
+    }
+    //signals
     sig rst                 // reset signal
+    sig slow_clock
+    
+    //constants
+    const SEVEN_SEG_DIV = $is_sim() ? 3 : 16
+    const CLK_FREQ = $is_sim() ? 1000 : 100000000
+    const SLOW_CLOCK_DEFAULT_SPEED = $is_sim() ? 8 : 24 // 8 for sim, 24 for physical
+    
     
     .clk(clk) {
         // The reset conditioner is used to synchronize the reset signal to the FPGA
         // clock. This ensures the entire FPGA comes out of reset at the same time.
         reset_conditioner reset_cond
         
-        edge_detector edge_detector(#RISE(1), #FALL(0))
+        //edge conditioner
+        edge_detector io_button_edge[5](#RISE({1, 1, 1, 1, 1}), #FALL({0, 0, 0, 0, 0}))
+        edge_detector slow_clock_edge(#RISE(1), #FALL(0)) // Add edge detector for slow_clock
         
+        // Button conditioners
+        button_conditioner io_button_cond[5](#CLK_FREQ({CLK_FREQ, CLK_FREQ, CLK_FREQ, CLK_FREQ, CLK_FREQ}))
+        
+        //setting up dff for states
         .rst(rst) {
-            // Reduce DIV values for simulation so it doesn't take forever
-            multi_seven_seg seg (#DIV($is_sim() ? 1 : 16), #DIGITS(4))
-            multi_decimal_counter dec_ctr (#DIGITS(4))
-            counter ctr (#SIZE(1), #DIV($is_sim() ? 8 : 24))
+            dff a_upper[16](#INIT(16b0))
+            dff a_lower[16](#INIT(16b0))
+            dff b_upper[16](#INIT(16b0))
+            dff b_lower[16](#INIT(16b0))
+            dff out_state[32](#INIT(32b0))
+            dff alufn_state[6](#INIT(6b0))
+            dff test_state[$width(TestStates)](#INIT(TestStates.START))
+            dff input_state[$width(InputStates)](#INIT(InputStates.A_UPPER))
+            dff output_state[$width(OutputStates)](#INIT(OutputStates.OUT_LOWER))
+            dff truth
+            //dff for address value
+            dff address[6](#INIT(34))
+            //dff for outputs
+            dff z_out
+            dff v_out
+            dff n_out
+            
+            // seven segment instantiation
+            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))
+            //multi_seven_seg_letters seg_letters(#DIV(SEVEN_SEG_DIV))
         }
     }
+    
+    //counter
+    counter counter(#SIZE(1), #DIV(SLOW_CLOCK_DEFAULT_SPEED), .clk(clk), .rst(rst))
     
     always {
         reset_cond.in = ~rst_n  // input raw inverted reset signal
         rst = reset_cond.out    // conditioned reset
+        usb_tx = usb_rx         // echo the serial data
         
-        led = c{3b0, io_button} // connect buttons to LEDs
+        //io button conditioning
+        io_button_cond.in = io_button
+        io_button_edge.in = io_button_cond.out
         
-        usb_tx = usb_rx         // loop serial port
+        //default led
+        io_led = 3x{{8b0}}
+        led = 8b0
+        in_state_renderer.value = address.q
         
-        edge_detector.in = ctr.value
-        dec_ctr.inc = edge_detector.out
-        seg.values = dec_ctr.digits
+        //setting alufn
+        alufn_state.d = alufn_state.q
         
-        io_segment = ~seg.seg // connect segments to the driver
-        io_select = ~seg.sel  // connect digit select to the driver
+        // Clock division logic
+        slow_clock = counter.value
         
-        io_led = io_dip       // connect the DIP switches to the LEDs
+        // Edge detector for slow_clock
+        slow_clock_edge.in = slow_clock // Connect slow_clock to edge detector
+        
+        //autotester driver
+        rom.address = address.q
+        truth_checker.actual_output = out_state.q
+        truth_checker.predicted_output = rom.answer
+        truth_checker.actual_z = z_out.q
+        truth_checker.predicted_z = rom.z
+        truth_checker.actual_v = v_out.q
+        truth_checker.predicted_v = rom.v
+        truth_checker.actual_n = n_out.q
+        truth_checker.predicted_n = rom.n
+        
+        case (test_state.q){
+            TestStates.START:
+                if (io_button_edge.out[3]){
+                    test_state.d = TestStates.IDLE
+                }
+            
+            TestStates.IDLE:
+                led[1] = 1
+                if (truth.q){
+                    io_led[2] = 8hFF
+                }
+                if (slow_clock_edge.out){
+                    test_state.d = TestStates.UPDATE
+                }
+                else if (io_button_edge.out[3]){
+                    test_state.d = TestStates.STOP
+                }
+            
+            TestStates.UPDATE:
+                //passing inputs into actual alu
+                a_upper.d = rom.a[31:16]
+                a_lower.d = rom.a[15:0]
+                b_upper.d = rom.b[31:16]
+                b_lower.d = rom.b[15:0]
+                alufn_state.d = rom.alufn
+                test_state.d = TestStates.INCREMENT
+            
+            TestStates.INCREMENT:
+                if (slow_clock_edge.out){
+                    truth.d = truth_checker.truth//truth_checker.truth
+                    if(address.q > 6b0){
+                        address.d = address.q - 1
+                        test_state.d = TestStates.IDLE
+                    }
+                    else if (address.q <= 6b0){
+                        test_state.d = TestStates.END
+                    }
+                }
+            
+            TestStates.STOP:
+            if (io_button_edge.out[3]){
+                test_state.d = TestStates.IDLE
+                }
+        }
+        
+        //setting up states
+        case (input_state.q){
+            InputStates.A_UPPER:
+                if (io_button_edge.out[1]){
+                    a_upper.d = c{io_dip[1], io_dip[0]}
+                    alufn_state.d = io_dip[2][5:0]
+                }
+                else if (io_button_edge.out[2]){
+                    input_state.d = InputStates.A_LOWER
+                }
+            InputStates.A_LOWER:
+                if (io_button_edge.out[1]){
+                    a_lower.d = c{io_dip[1], io_dip[0]}
+                    alufn_state.d = io_dip[2][5:0]
+                }
+                else if (io_button_edge.out[2]){
+                    input_state.d = InputStates.B_UPPER
+                }
+                else if (io_button_edge.out[0]){
+                    input_state.d = InputStates.A_UPPER
+                }
+            InputStates.B_UPPER:
+                if (io_button_edge.out[1]){
+                    b_upper.d = c{io_dip[1], io_dip[0]}
+                    alufn_state.d = io_dip[2][5:0]
+                }
+                else if (io_button_edge.out[2]){
+                    input_state.d = InputStates.B_LOWER
+                }
+                else if (io_button_edge.out[0]){
+                    input_state.d = InputStates.A_LOWER
+                }
+            InputStates.B_LOWER:
+                if (io_button_edge.out[1]){
+                    b_lower.d = c{io_dip[1], io_dip[0]}
+                    alufn_state.d = io_dip[2][5:0]
+                }
+                else if (io_button_edge.out[0]){
+                    input_state.d = InputStates.B_UPPER
+                }
+        }
+        
+        case (output_state.q){
+            OutputStates.OUT_UPPER:
+                io_led[1] = out_state.q[31:24]
+                io_led[0] = out_state.q[23:16]
+                if (io_button_edge.out[4]){
+                    output_state.d = OutputStates.OUT_LOWER
+                }
+            OutputStates.OUT_LOWER:
+                io_led[1] = out_state.q[15:8]
+                io_led[0] = out_state.q[7:0]
+                if (io_button_edge.out[4]){
+                    output_state.d = OutputStates.OUT_UPPER
+                }
+        }
+        
+        //setting up ALU
+        alu.a = c{a_upper.q, a_lower.q}
+        alu.b = c{b_upper.q, b_lower.q}
+        alu.alufn = alufn_state.q
+        out_state.d = alu.out
+        z_out.d = alu.z
+        v_out.d = alu.v
+        n_out.d = alu.n
+        
+        //output to leds
+        led[0] = output_state.q
+        led[1] = (input_state.q == 0)
+        led[2] = (input_state.q == 1)
+        led[3] = (input_state.q == 2)
+        led[4] = (input_state.q == 3)
+        led[5] = z_out.q
+        led[6] = v_out.q
+        led[7] = n_out.q
+        
+        //output to seven seg
+        //in_state_renderer.value = input_state.q
+        seg.values = in_state_renderer.digits
+        io_segment = ~seg.seg
+        io_select = ~seg.sel
     }
 }
