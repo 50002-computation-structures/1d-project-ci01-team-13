@@ -1,0 +1,142 @@
+module rom (
+    input address[6],
+    output alufn[6],
+    output a[32],
+    output b[32],
+    output answer[32],
+    output z,
+    output v,
+    output n
+) {
+    const ROM = {
+        //format is alufn, a, b, expected answer, z, v, n
+        
+        //ADD
+        //test 34: A + 0
+        {32h00000000, 32h00000001, 32h00000000, 32h00000001, 32b0, 32b0, 32b0},
+        
+        //test 33: 0 + B
+        {32h00000000, 32h00000000, 32h00000001, 32h00000001, 32b0, 32b0, 32b0},
+        
+        //test 32: adding 2 positive numbers
+        {32h00000000, 32h0000FDA1, 32h00000001, 32h0000FDA2, 32b0, 32b0, 32b0},
+        
+        //test 31: overflow test
+        {32h00000000, 32h7FFFFFFF, 32h00000001, 32h80000000, 32b0, 32b1, 32b1},
+        
+        //SUB
+        //test 30: A - 0
+        {32h00000001, 32h312FD930, 32h00000000, 32h312FD930, 32b0, 32b0, 32b0},
+        
+        //test 29: 0 - A
+        {32h00000001, 32h00000000, 32h00004556, 32hFFFFBAAA, 32b0, 32b0, 32b1},
+        
+        //test 28: subtract large number from small number to test underflow
+        {32h00000001, 32h00000001, 32h7FFFFFFF, 32h80000002, 32b0, 32b0, 32b1},
+        
+        //test 27: subtract max from 0
+        {32h00000001, 32h00000000, 32h7FFFFFFF, 32h80000001, 32b0, 32b0, 32b1},
+        
+        //MUL
+        //test 26: multiply by 0
+        {32h00000002, 32h00000000, 32h12345678, 32h00000000, 32b0, 32b0, 32b0},
+        
+        //test 25: A * 1
+        {32h00000002, 32h00000002, 32h00000001, 32h00000002, 32b0, 32b0, 32b0},
+        
+        //test 24: positive numbers
+        {32h00000002, 32h00000006, 32h00000002, 32h0000000C, 32b0, 32b0, 32b0},
+        
+        //AND
+        //test 23: A AND 0 should be 0
+        {32h00000018, 32h00000015, 32h00000000, 32h00000000, 32b0, 32b0, 32b0},
+        
+        //test 22: A AND 0xFFFF should be A
+        {32h00000018, 32h00000015, 32h0000FFFF, 32h00000015, 32b0, 32b0, 32b0},
+        
+        //test 21: A AND A should give A
+        {32h00000018, 32h00000015, 32h00000015, 32h00000015, 32b0, 32b0, 32b0},
+        
+        //test 20: A AND NOT A should give 0
+        {32h00000018, 32hF0F0F0F0, 32h0F0F0F0F, 32h00000000, 32b0, 32b0, 32b1},
+        
+        //OR 
+        //test 19: A OR 0 should be A
+        {32h0000001E, 32h00000015, 32h00000000, 32h00000015, 32b0, 32b0, 32b0},
+        
+        //test 18: A OR 0xFFFF should be 0xFFFF
+        {32h0000001E, 32h00000015, 32h0000FFFF, 32h0000FFFF, 32b0, 32b0, 32b0},
+        
+        //XOR
+        //test 17: A XOR 0 should give A
+        {32h00000016, 32h00000015, 32h00000000, 32h00000015, 32b0, 32b0, 32b0},
+        
+        //test 16: A XOR A should give 0
+        {32h00000016, 32h00000015, 32h00000015, 32h00000000, 32b0, 32b0, 32b0},
+        
+        //test 15: A XOR NOT A should give 0xFFFF
+        {32h00000016, 32hF0F0F0F0, 32h0F0F0F0F, 32hFFFFFFFF, 32b0, 32b0, 32b1},
+        
+        //"A"
+        //test 14: A gives A
+        {32h0000001A, 32hF0F0F0F0, 32h0F0F0F0F, 32hF0F0F0F0, 32b0, 32b0, 32b1},
+        
+        //SHL
+        //test 13: shifting A by 0 should give A
+        {32h00000020, 32h00000001, 32h00000002, 32h00000004, 32b0, 32b0, 32b0},
+        
+        //test 12: shifting a number by 31 bits
+        {32h00000020, 32h00000001, 32h0000001F, 32h80000000, 32b0, 32b0, 32b0},
+        
+        //test 11: shift a number with 1 in MSB
+        {32h00000020, 32h80000001, 32h00000001, 32h00000002, 32b0, 32b0, 32b1},
+        
+        //SHR
+        //test 10: shifting A by 0 should give A
+        {32h00000021, 32h00000100, 32h00000000, 32h00000100, 32b0, 32b0, 32b0},
+        
+        //test 9: shifting a number by 31 bits
+        {32h00000021, 32h80000000, 32h0000001F, 32h00000001, 32b0, 32b1, 32b0},
+        
+        //test 8: ensure vacated bits are 0
+        {32h00000021, 32h80000100, 32h0000001F, 32h00000001, 32b0, 32b0, 32b1},
+        
+        //SRA
+        //test 7: ensure the sign bit is replicated
+        {32h00000023, 32h80000100, 32h00000008, 32hFF800001, 32b0, 32b0, 32b1},
+        
+        //CMPEQ
+        //test 6: equal values
+        {32h00000033, 32h00000100, 32h00000100, 32h00000001, 32b1, 32b0, 32b0},
+        
+        //test 5: different values
+        {32h00000033, 32h00000100, 32h00000010, 32h00000000, 32b0, 32b0, 32b0},
+        
+        //CMPLT
+        //test 4: A < B
+        {32h00000035, 32h00000001, 32h00000010, 32h0000001, 32b0, 32b0, 32b1},
+        
+        //test 3: A >= B
+        {32h00000035, 32h00000100, 32h00000010, 32h0000000, 32b0, 32b0, 32b0},
+        
+        //CMPLE
+        //test 2: A < B
+        {32h00000037, 32h00000001, 32h00000010, 32h0000001, 32b0, 32b0, 32b1},
+        
+        //test 1: A <= B
+        {32h00000037, 32h00000010, 32h00000010, 32h0000001, 32b0, 32b1, 32b0},
+        
+        //test 0: A > B
+        {32h00000037, 32h00000100, 32h00000010, 32h0000000, 32b0, 32b0, 32b0}
+        
+    }
+    always {
+        alufn = ROM[address][6][5:0]
+        a = ROM[address][5]
+        b = ROM[address][4]
+        answer = ROM[address][3]
+        z = ROM[address][2][0]
+        v = ROM[address][1][0]
+        n = ROM[address][0][0]
+    }
+}

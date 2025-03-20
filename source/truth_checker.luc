@@ -1,0 +1,19 @@
+module truth_checker (
+    input actual_output[32],
+    input actual_z,
+    input actual_v,
+    input actual_n,
+    input predicted_output[32],
+    input predicted_z,
+    input predicted_v,
+    input predicted_n,
+    output truth
+) {
+    always {
+        //return 1bit output truth which checks if output, z, v, n are all correct
+        truth = (actual_output == predicted_output) &&
+                (actual_z == predicted_z) &&
+                (actual_v == predicted_v) &&
+                (actual_n == predicted_n)
+    }
+}
