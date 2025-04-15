@@ -1,0 +1,83 @@
+module led_driver#(
+    COLUMN_DIMENSION = 16d16 : COLUMN_DIMENSION > 0,
+    ROW_DIMENSION = 16d1 : ROW_DIMENSION > 0,
+    PIXEL_COUNT = 16d8 : PIXEL_COUNT > 0,
+    BUFFER_SIZE = 1024 : BUFFER_SIZE > 0 // ensure this value is larger than PIXEL_COUNT * $clog2(COLOR_ENCODING)
+) (
+    input clk,              // 100MHz clock
+    input rst,            // reset button (active low)
+    input led1[32],
+    input led2[32],
+    input led3[32],
+    output data[3]
+) {
+    
+    // GREEN (00), BLUE (10), RED (01), OFF (00)
+    const COLOR_ENCODING1 = {24h00FF00, 24hFF0000, 24h00FF00, 24h0}
+    const COLOR_ENCODING2 = {24hFF0000, 24hFF0000, 24h00FF00, 24h0} 
+    const COLOR_ENCODING3 = {24h0000FF, 24hFF0000, 24h00FF00, 24h0}  
+    const ENCODING_AMOUNT = $width(COLOR_ENCODING1, 0)   
+    
+    sig pixel_address1[BUFFER_SIZE]
+    sig pixel_address2[BUFFER_SIZE]
+    sig pixel_address3[BUFFER_SIZE]
+    sig current_pixel_encoding_1[$clog2(ENCODING_AMOUNT)]
+    sig current_pixel_encoding_2[$clog2(ENCODING_AMOUNT)]
+    sig current_pixel_encoding_3[$clog2(ENCODING_AMOUNT)]
+    
+    
+    const CLK_FREQ = $is_sim() ? 1000 : 10000000
+    //index_reverser index_reverser1(#COLUMN_DIMENSION(COLUMN_DIMENSION), #SIZE($clog2(PIXEL_COUNT))) 
+    //index_reverser index_reverser2(#COLUMN_DIMENSION(COLUMN_DIMENSION), #SIZE($clog2(PIXEL_COUNT))) 
+    //index_reverser index_reverser3(#COLUMN_DIMENSION(COLUMN_DIMENSION), #SIZE($clog2(PIXEL_COUNT))) 
+    
+    ws2812b_driver driver1(#PIXEL_COUNT(PIXEL_COUNT), .rst(rst), .clk(clk))
+    ws2812b_driver driver2(#PIXEL_COUNT(PIXEL_COUNT), .rst(rst), .clk(clk))
+    ws2812b_driver driver3(#PIXEL_COUNT(PIXEL_COUNT), .rst(rst), .clk(clk))
+    
+    .clk(clk){
+        .rst(rst){
+            dff led_encoding_1[BUFFER_SIZE](#INIT(2))
+            dff led_encoding_2[BUFFER_SIZE](#INIT(2))
+            dff led_encoding_3[BUFFER_SIZE](#INIT(2))
+        }
+    }
+    
+    always {
+        //default values
+        data = 0
+        driver1.update = 1
+        driver2.update = 1
+        driver3.update = 1
+        driver1.clear = 0
+        driver2.clear = 0
+        driver3.clear = 0
+        led_encoding_1.d = led_encoding_1.q
+        led_encoding_2.d = led_encoding_2.q
+        led_encoding_3.d = led_encoding_3.q
+        
+        // connect reverser to driver
+        //index_reverser1.input_address = driver1.pixel_address
+        //index_reverser2.input_address = driver2.pixel_address
+        //index_reverser3.input_address = driver3.pixel_address
+        
+        //setting pixel address
+        pixel_address1 = driver1.pixel_address
+        pixel_address2 = driver2.pixel_address
+        pixel_address3 = driver3.pixel_address
+        
+        repeat(index, $clog2(ENCODING_AMOUNT)){
+            current_pixel_encoding_1[index] = led_encoding_1.q[led1[pixel_address1]]
+            current_pixel_encoding_2[index] = led_encoding_2.q[led2[pixel_address2]]
+            current_pixel_encoding_3[index] = led_encoding_3.q[led3[pixel_address3]]
+        }
+        
+        driver1.color = COLOR_ENCODING1[current_pixel_encoding_1]
+        driver2.color = COLOR_ENCODING2[current_pixel_encoding_2]
+        driver3.color = COLOR_ENCODING3[current_pixel_encoding_3]
+        
+        data[0] = driver1.data
+        data[1] = driver2.data
+        data[2] = driver3.data
+    }
+}

@@ -1,0 +1,13 @@
+module clamp (
+    input a[32],
+    output out[32]
+) {
+    always {
+        case (a[31]){
+            0: out = a
+            1: out = 32b0
+            default:
+            out = 32b0
+        }
+    }
+}

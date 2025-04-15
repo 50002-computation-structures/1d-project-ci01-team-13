@@ -1,0 +1,167 @@
+module alchitry_top (
+    input clk,              // 100MHz clock
+    input rst_n,            // reset button (active low)
+    output led[8],          // 8 user controllable LEDs
+    input usb_rx,           // USB->Serial input
+    output usb_tx,           // USB->Serial output
+    output io_led[3][8],     // LEDs on IO Shield
+    output io_segment[8],        // 7-segment LEDs on IO Shield
+    output io_select[4],        // Digit select on IO Shield
+    input io_button[5],      // 5 buttons on IO Shield
+    input io_dip[3][8],       // DIP switches on IO Shield,
+    output data[3]
+) {
+    //setting up alu
+    alu alu
+    
+    //function for 7seg
+    bin_to_dec in_state_renderer(#DIGITS(4), #LEADING_ZEROS(0))
+    //bin_to_dec err_renderer(#DIGITS(4), #LEADING_ZEROS(0))
+    
+    //signals
+    sig rst                 // reset signal
+    sig slow_clock
+    sig alufn[6]
+    sig asel
+    sig bsel
+    sig wdsel[2]
+    sig ra1[3] 
+    sig ra2[3] 
+    sig wa[3] 
+    sig we
+    sig alu_out[32]
+    
+    //setting up regfile
+    regfile regfile(.clk(clk), .rst(rst))
+    
+    //constants
+    const SEVEN_SEG_DIV = $is_sim() ? 3 : 16
+    const CLK_FREQ = $is_sim() ? 1000 : 10000000
+    const SLOW_CLOCK_DEFAULT_SPEED = $is_sim() ? 9 : 24 // 8 for sim, 24 for physical
+    
+    //muxes
+    mux_2 asel_mux
+    mux_2 bsel_mux
+    mux_4_32_bit_1_sel wdsel_mux
+    
+    .clk(clk) {
+        // The reset conditioner is used to synchronize the reset signal to the FPGA
+        // clock. This ensures the entire FPGA comes out of reset at the same time.
+        reset_conditioner reset_cond
+        
+        //edge conditioner
+        edge_detector io_button_edge[5](#RISE({1, 1, 1, 1, 1}), #FALL({0, 0, 0, 0, 0}))
+        edge_detector slow_clock_edge(#RISE(1), #FALL(0)) // Add edge detector for slow_clock
+        
+        // Button conditioners
+        button_conditioner io_button_cond[5](#CLK_FREQ({CLK_FREQ, CLK_FREQ, CLK_FREQ, CLK_FREQ, CLK_FREQ}))
+        
+        //setting up dff for states
+        .rst(rst) {
+            dff reset
+            // seven segment instantiation
+            multi_seven_seg seg(#DIV(SEVEN_SEG_DIV))
+            
+            //led driver instatiation
+            led_driver led_driver
+        }
+    }
+    
+    //counter
+    counter counter(#SIZE(1), #DIV(SLOW_CLOCK_DEFAULT_SPEED), .clk(clk), .rst(rst))
+    
+    //datapath
+    datapath datapath(.clk(clk), .rst(rst))
+    
+    always {
+        reset_cond.in = ~rst_n  // input raw inverted reset signal
+        rst = reset_cond.out    // conditioned reset
+        usb_tx = usb_rx         // echo the serial data
+        
+        //io button conditioning
+        io_button_cond.in = io_button
+        io_button_edge.in = io_button_cond.out
+        
+        //slow clock connection
+        slow_clock = counter.value
+        slow_clock_edge.in = slow_clock
+        
+        //default alu sig
+        alu_out = alu.out
+        
+        //setting up datapath
+        datapath.alu_out = alu_out
+        datapath.io_button_edge = io_button_edge.out
+        datapath.slow_clock_edge = slow_clock_edge.out
+        
+        //setting up signals
+        ra1 = datapath.ra1
+        ra2 = datapath.ra2
+        wa = datapath.wa
+        we = datapath.we
+        alufn = datapath.alufn
+        asel = datapath.asel
+        bsel = datapath.bsel
+        wdsel = datapath.wdsel
+        reset.d = datapath.reset_cond
+        
+        //reset trigger
+        if (datapath.reset_cond){
+            reset_cond.in = 1
+        }
+        
+        //setting up alu
+        alu.a = asel_mux.out
+        alu.b = bsel_mux.out
+        
+        //alufn input to alu
+        alu.alufn = alufn
+        alu_out = alu.out
+        
+        //output leds    
+        io_led[2] = regfile.led1[7:0]
+        io_led[1] = regfile.led2[7:0]
+        io_led[0] = regfile.led3[7:0]
+        led = 8b0
+        
+        //setting up default for asel & bsel
+        asel_mux.s0 = asel
+        asel_mux.i1 = 32b0
+        bsel_mux.s0 = bsel
+        bsel_mux.i1 = 32b1
+        
+        //connecting regfile to asel & bsel
+        asel_mux.i0 = regfile.rd1
+        bsel_mux.i0 = regfile.rd2
+        
+        //adding selection signals
+        wdsel_mux.s0 = wdsel
+        
+        //setting up wdsel
+        wdsel_mux.in[0] = alu.out
+        wdsel_mux.in[1] = 32hFFFF
+        wdsel_mux.in[2] = 32hF
+        wdsel_mux.in[3] = 23h0
+        
+        //setting up regfile
+        regfile.wa = wa
+        regfile.we = we
+        regfile.ra1 = ra1
+        regfile.ra2 = ra2
+        regfile.wdsel = wdsel_mux.out
+        
+        //input into driver
+        led_driver.led1 = regfile.led1
+        led_driver.led2 = regfile.led2
+        led_driver.led3 = regfile.led3
+        
+        //output to data pins
+        data = led_driver.data
+        
+        //output to seven seg
+        in_state_renderer.value = regfile.score
+        seg.values = in_state_renderer.digits
+        io_segment = ~seg.seg
+        io_select = ~seg.sel
+    }
+}

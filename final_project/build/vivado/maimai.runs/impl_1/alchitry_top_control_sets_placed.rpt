@@ -1,0 +1,101 @@
+Copyright 1986-2022 Xilinx, Inc. All Rights Reserved. Copyright 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+---------------------------------------------------------------------------------------------------------------------------------------------
+| Tool Version : Vivado v.2023.2 (win64) Build 4029153 Fri Oct 13 20:14:34 MDT 2023
+| Date         : Wed Apr 16 01:14:29 2025
+| Host         : choon running 64-bit major release  (build 9200)
+| Command      : report_control_sets -verbose -file alchitry_top_control_sets_placed.rpt
+| Design       : alchitry_top
+| Device       : xc7a35t
+---------------------------------------------------------------------------------------------------------------------------------------------
+
+Control Set Information
+
+Table of Contents
+-----------------
+1. Summary
+2. Histogram
+3. Flip-Flop Distribution
+4. Detailed Control Set Information
+
+1. Summary
+----------
+
++----------------------------------------------------------+-------+
+|                          Status                          | Count |
++----------------------------------------------------------+-------+
+| Total control sets                                       |    23 |
+|    Minimum number of control sets                        |    23 |
+|    Addition due to synthesis replication                 |     0 |
+|    Addition due to physical synthesis replication        |     0 |
+| Unused register locations in slices containing registers |    53 |
++----------------------------------------------------------+-------+
+* Control sets can be merged at opt_design using control_set_merge or merge_equivalent_drivers
+** Run report_qor_suggestions for automated merging and remapping suggestions
+
+
+2. Histogram
+------------
+
++--------------------+-------+
+|       Fanout       | Count |
++--------------------+-------+
+| Total control sets |    23 |
+| >= 0 to < 4        |     0 |
+| >= 4 to < 6        |     5 |
+| >= 6 to < 8        |     3 |
+| >= 8 to < 10       |     0 |
+| >= 10 to < 12      |     0 |
+| >= 12 to < 14      |     4 |
+| >= 14 to < 16      |     4 |
+| >= 16              |     7 |
++--------------------+-------+
+* Control sets can be remapped at either synth_design or opt_design
+
+
+3. Flip-Flop Distribution
+-------------------------
+
++--------------+-----------------------+------------------------+-----------------+--------------+
+| Clock Enable | Synchronous Set/Reset | Asynchronous Set/Reset | Total Registers | Total Slices |
++--------------+-----------------------+------------------------+-----------------+--------------+
+| No           | No                    | No                     |              13 |            8 |
+| No           | No                    | Yes                    |               4 |            2 |
+| No           | Yes                   | No                     |              64 |           22 |
+| Yes          | No                    | No                     |               0 |            0 |
+| Yes          | No                    | Yes                    |               0 |            0 |
+| Yes          | Yes                   | No                     |             314 |          142 |
++--------------+-----------------------+------------------------+-----------------+--------------+
+
+
+4. Detailed Control Set Information
+-----------------------------------
+
++----------------+------------------------------------------------------------------+-------------------------------------------------------------------+------------------+----------------+--------------+
+|  Clock Signal  |                           Enable Signal                          |                          Set/Reset Signal                         | Slice Load Count | Bel Load Count | Bels / Slice |
++----------------+------------------------------------------------------------------+-------------------------------------------------------------------+------------------+----------------+--------------+
+|  clk_IBUF_BUFG |                                                                  | datapath/AS[0]                                                    |                2 |              4 |         2.00 |
+|  clk_IBUF_BUFG | datapath/FSM_sequential_D_state_q[4]_i_1_n_0                     | reset_cond/Q[0]                                                   |                2 |              5 |         2.50 |
+|  clk_IBUF_BUFG | led_driver/driver1/D_bit_ctr_d                                   | reset_cond/Q[0]                                                   |                2 |              5 |         2.50 |
+|  clk_IBUF_BUFG | led_driver/driver2/D_bit_ctr_d                                   | reset_cond/Q[0]                                                   |                2 |              5 |         2.50 |
+|  clk_IBUF_BUFG | led_driver/driver3/D_bit_ctr_d                                   | reset_cond/Q[0]                                                   |                2 |              5 |         2.50 |
+|  clk_IBUF_BUFG | led_driver/driver1/D_ctr_d                                       | reset_cond/Q[0]                                                   |                3 |              7 |         2.33 |
+|  clk_IBUF_BUFG | led_driver/driver2/D_ctr_d                                       | reset_cond/Q[0]                                                   |                3 |              7 |         2.33 |
+|  clk_IBUF_BUFG | led_driver/driver3/D_ctr_d                                       | reset_cond/Q[0]                                                   |                3 |              7 |         2.33 |
+|  clk_IBUF_BUFG |                                                                  |                                                                   |                8 |             13 |         1.62 |
+|  clk_IBUF_BUFG | led_driver/driver1/D_rst_ctr_q[0]_i_1__1_n_0                     | reset_cond/Q[0]                                                   |                4 |             13 |         3.25 |
+|  clk_IBUF_BUFG | led_driver/driver2/D_rst_ctr_q[0]_i_1__0_n_0                     | reset_cond/Q[0]                                                   |                4 |             13 |         3.25 |
+|  clk_IBUF_BUFG | led_driver/driver3/D_rst_ctr_q[0]_i_1_n_0                        | reset_cond/Q[0]                                                   |                4 |             13 |         3.25 |
+|  clk_IBUF_BUFG | forLoop_idx_0_1767566733[0].io_button_cond/D_ctr_q[0]_i_2__2_n_0 | forLoop_idx_0_1767566733[0].io_button_cond/sync/D_pipe_q_reg[1]_0 |                4 |             14 |         3.50 |
+|  clk_IBUF_BUFG | forLoop_idx_0_1767566733[1].io_button_cond/D_ctr_q[0]_i_2__1_n_0 | forLoop_idx_0_1767566733[1].io_button_cond/sync/D_pipe_q_reg[1]_0 |                4 |             14 |         3.50 |
+|  clk_IBUF_BUFG | forLoop_idx_0_1767566733[3].io_button_cond/D_ctr_q[0]_i_2__0_n_0 | forLoop_idx_0_1767566733[3].io_button_cond/sync/D_pipe_q_reg[1]_0 |                4 |             14 |         3.50 |
+|  clk_IBUF_BUFG | forLoop_idx_0_1767566733[4].io_button_cond/D_ctr_q[0]_i_2_n_0    | forLoop_idx_0_1767566733[4].io_button_cond/sync/clear             |                4 |             14 |         3.50 |
+|  clk_IBUF_BUFG |                                                                  | seg/ctr/D_ctr_q[0]_i_1__6_n_0                                     |                5 |             18 |         3.60 |
+|  clk_IBUF_BUFG | datapath/FSM_sequential_D_state_q_reg[4]_0[0]                    | reset_cond/Q[0]                                                   |               16 |             32 |         2.00 |
+|  clk_IBUF_BUFG | datapath/FSM_sequential_D_state_q_reg[0]_2[0]                    | reset_cond/Q[0]                                                   |               19 |             32 |         1.68 |
+|  clk_IBUF_BUFG | datapath/E[0]                                                    | reset_cond/Q[0]                                                   |               23 |             34 |         1.48 |
+|  clk_IBUF_BUFG | datapath/FSM_sequential_D_state_q_reg[3]_0[0]                    | reset_cond/Q[0]                                                   |               20 |             40 |         2.00 |
+|  clk_IBUF_BUFG | datapath/FSM_sequential_D_state_q_reg[3]_1[0]                    | reset_cond/Q[0]                                                   |               19 |             40 |         2.11 |
+|  clk_IBUF_BUFG |                                                                  | reset_cond/Q[0]                                                   |               17 |             46 |         2.71 |
++----------------+------------------------------------------------------------------+-------------------------------------------------------------------+------------------+----------------+--------------+
+
+

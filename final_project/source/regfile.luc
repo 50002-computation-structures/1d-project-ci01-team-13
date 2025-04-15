@@ -1,0 +1,105 @@
+module regfile (
+    input clk,  // clock
+    input rst,  // reset
+    
+    input wa[3],
+    input ra1[3],
+    input ra2[3],
+    input we,
+    input wdsel[32],
+    
+    output rd1[32],
+    output rd2[32],
+    output led1[32], 
+    output led2[32],
+    output led3[32],
+    output score[32]
+) {
+    .clk(clk){
+        .rst(rst){
+            dff led1_dff[32](#INIT(32b10100100010001000100010001000100))
+            dff led2_dff[32](#INIT(32b01010010001010101010101000100010))
+            dff led3_dff[32](#INIT(32b00001001100100010001000110011000))
+            dff score_dff[32](#INIT(0))
+            dff clk_dff[32](#INIT(2))
+            dff dff_5[32](#INIT(2))
+            dff dff_6[32](#INIT(0))
+            dff dff_7[32](#INIT(0))
+        }
+    }
+    
+    always {      
+        //if write enabled
+        if (we){
+            //write to respective register
+            case (wa){
+                0:
+                    led1_dff.d = wdsel
+                1:
+                    led2_dff.d = wdsel
+                2:
+                    led3_dff.d = wdsel
+                3:
+                    score_dff.d = wdsel
+                4:
+                    clk_dff.d = wdsel
+                5:
+                    dff_5.d = wdsel
+                6:
+                    dff_6.d = wdsel
+                7:
+                    dff_7.d = wdsel
+            }
+        }
+        
+        //outputing read address 1
+        case (ra1){
+            0:
+                rd1 = led1_dff.q
+            1:
+                rd1 = led2_dff.q
+            2:
+                rd1 = led3_dff.q
+            3:
+                rd1 = score_dff.q
+            4:
+                rd1 = clk_dff.q
+            5:
+                rd1 = dff_5.q
+            6:
+                rd1 = dff_6.q
+            7:
+                rd1 = dff_7.q
+            default: 
+                rd1 = 0
+        }
+        
+        //outputting read address 2
+        case (ra2){
+            0:
+                rd2 = led1_dff.q
+            1:
+                rd2 = led2_dff.q
+            2:
+                rd2 = led3_dff.q
+            3:
+                rd2 = score_dff.q
+            4:
+                rd2 = clk_dff.q
+            5:
+                rd2 = dff_5.q
+            6:
+                rd2 = dff_6.q
+            7:
+                rd2 = dff_7.q
+            default:
+                rd2 = 0
+        }
+        
+        // setting up outputs
+        led1 = led1_dff.q
+        led2 = led2_dff.q
+        led3 = led3_dff.q
+        score = score_dff.q
+    }
+}

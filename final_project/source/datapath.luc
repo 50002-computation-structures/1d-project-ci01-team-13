@@ -1,0 +1,302 @@
+module datapath (
+    input clk,  // clock
+    input rst,  // reset
+    input io_button_edge[5],
+    input slow_clock_edge,
+    input alu_out[32],
+    
+    output alufn[6],
+    output asel,
+    output bsel,
+    output wdsel[2],
+    output ra1[3] ,
+    output ra2[3] ,
+    output wa[3], 
+    output we,
+    output reset_cond
+) {
+    enum States{
+        START,
+        IDLE1,
+        PAUSE,
+        DECREASE_CLK_NO_PRESS,
+        CHECK_CLK_OVER_NO_PRESS,
+        DEDUCT_SCORE_NO_PRESS,
+        CLAMP_SCORE_TO_ZERO_NO_PRESS,
+        CHECK_CORRECT_INPUT_1,
+        CHECK_CORRECT_INPUT_2,
+        CHECK_CORRECT_INPUT_3,
+        INCREMENT_SCORE,
+        DEDUCT_SCORE,
+        CLAMP_SCORE_TO_ZERO,
+        IDLE2,
+        DECREASE_CLK,
+        CHECK_CLK_OVER,
+        RESET_CLK,
+        UPDATE_POSITION_1,
+        UPDATE_POSITION_2,
+        UPDATE_POSITION_3,
+        CHECK_END,
+        END
+    }
+    
+    .clk(clk){
+        .rst(rst){
+            dff state[5](#INIT(States.START))
+        }
+    }
+    
+    always {
+        
+        //default signals
+        ra1 = 3b000
+        ra2 = 3b000
+        wa = 3b000
+        we = b0
+        alufn = 6b000000
+        asel = b0
+        bsel = b0
+        wdsel = b0
+        reset_cond = 0
+        
+        //FSM logic
+        case (state.q){
+            States.START:
+                we = b0
+                if (io_button_edge[0]){
+                    state.d = States.IDLE1
+                }
+            
+            States.IDLE1:
+                we = b0
+                if (slow_clock_edge){
+                    state.d = States.DECREASE_CLK_NO_PRESS
+                }
+                if (io_button_edge[0]){
+                    state.d = States.PAUSE
+                }
+                if (io_button_edge[3]){
+                    state.d = States.CHECK_CORRECT_INPUT_1
+                }
+                if (io_button_edge[1]){
+                    state.d = States.CHECK_CORRECT_INPUT_2
+                }
+                if (io_button_edge[4]){
+                    state.d = States.CHECK_CORRECT_INPUT_3
+                }
+            
+            States.PAUSE:
+                we = b0
+                if (io_button_edge[0]){
+                    state.d = States.IDLE1
+                }
+            
+            States.DECREASE_CLK_NO_PRESS:
+                ra1 = 4
+                ra2 = 0
+                wa = 4
+                we = 1
+                alufn = b000001
+                asel = b0
+                bsel = b1
+                wdsel = b00
+                state.d = States.CHECK_CLK_OVER_NO_PRESS
+            
+            States.CHECK_CLK_OVER_NO_PRESS:
+                ra1 = 4
+                ra2 = 7
+                we = 0
+                alufn = b110011
+                asel = 0
+                bsel = 0
+                wdsel = b00
+                if (alu_out[0] == 0){
+                    state.d = States.IDLE1
+                }
+                else if (alu_out[0] == 1){
+                    state.d = States.DEDUCT_SCORE_NO_PRESS
+                }
+            
+            States.DEDUCT_SCORE_NO_PRESS:
+                ra1 = 3
+                wa = 3
+                we = 1
+                alufn = b000001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.CLAMP_SCORE_TO_ZERO_NO_PRESS
+            
+            States.CLAMP_SCORE_TO_ZERO_NO_PRESS:
+                ra1 = 3
+                ra2 = 7
+                wa = 3
+                we = 1
+                alufn = b000010
+                asel = 0
+                bsel = 0
+                wdsel = b00
+                state.d = States.RESET_CLK
+            
+            States.CHECK_CORRECT_INPUT_1:
+                ra1 = 0
+                we = 0
+                alufn = b010001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                if (alu_out[0] == 1){
+                    state.d = States.INCREMENT_SCORE
+                }
+                else if (alu_out[0] == 0){
+                    state.d = States.DEDUCT_SCORE
+                }
+            
+            States.CHECK_CORRECT_INPUT_2:
+                ra1 = 1
+                we = 0
+                alufn = b010001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                if (alu_out[0] == 1){
+                    state.d = States.INCREMENT_SCORE
+                }
+                else if (alu_out[0] == 0){
+                    state.d = States.DEDUCT_SCORE
+                }
+            
+            States.CHECK_CORRECT_INPUT_3:
+                ra1 = 2
+                we = 0
+                alufn = b010001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                if (alu_out[0] == 1){
+                    state.d = States.INCREMENT_SCORE
+                }
+                else if (alu_out[0] == 0){
+                    state.d = States.DEDUCT_SCORE
+                }
+            
+            States.DEDUCT_SCORE:
+                ra1 = 3
+                wa = 3
+                we = 1
+                alufn = b000001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.CLAMP_SCORE_TO_ZERO
+            
+            States.CLAMP_SCORE_TO_ZERO:
+                ra1 = 3
+                wa = 3
+                we = 1
+                alufn = b000010
+                asel = 0
+                bsel = 0
+                wdsel = b00 
+                state.d = States.IDLE2
+            
+            States.INCREMENT_SCORE:
+                ra1 = 3
+                wa = 3
+                we = 1
+                alufn = b000000
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.IDLE2
+            
+            States.IDLE2:
+                we = b0
+                if (slow_clock_edge){
+                    state.d = States.DECREASE_CLK
+                }
+            
+            States.DECREASE_CLK:
+                ra1 = 4
+                wa = 4
+                we = 1
+                alufn = b000001
+                asel = b0
+                bsel = b1
+                wdsel = b00
+                state.d = States.CHECK_CLK_OVER
+            
+            States.CHECK_CLK_OVER:
+                ra1 = 4
+                ra2 = 7
+                we = 0
+                alufn = b110011
+                asel = 0
+                bsel = 0
+                wdsel = b00
+                if (alu_out[0] == 0){
+                    state.d = States.IDLE2
+                }
+                else if (alu_out[0] == 1){
+                    state.d = States.RESET_CLK
+                }
+            
+            States.RESET_CLK:
+                ra1 = 5
+                ra2 = 7
+                wa = 4
+                we = 1
+                alufn = b000000
+                asel = 0
+                bsel = 0
+                state.d = States.UPDATE_POSITION_1
+            
+            States.UPDATE_POSITION_1:
+                ra1 = 0
+                wa = 0
+                we = 1
+                alufn = b100001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.UPDATE_POSITION_2
+            
+            States.UPDATE_POSITION_2:
+                ra1 = 1
+                wa = 1
+                we = 1
+                alufn = b100001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.UPDATE_POSITION_3
+            
+            States.UPDATE_POSITION_3:
+                ra1 = 2
+                wa = 2
+                we = 1
+                alufn = b100001
+                asel = 0
+                bsel = 1
+                wdsel = b00
+                state.d = States.CHECK_END
+            
+            States.CHECK_END:
+                ra1 = 0
+                ra2 = 7
+                we = 0
+                asel = 0
+                bsel = 0
+                wdsel = b00
+                alufn = b110011
+                if (alu_out[0] == 0){
+                    state.d = States.IDLE1
+                }
+                else if (alu_out[0] == 1){
+                    state.d = States.END
+                }
+            States.END:
+                reset_cond = io_button_edge[0]
+        }
+    }
+}

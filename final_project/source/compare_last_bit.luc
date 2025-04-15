@@ -1,0 +1,15 @@
+module compare_last_bit (
+    input a[32],
+    input b[32],
+    output out[32]
+) {
+    sig check
+    always {
+        check = (a[0] == b[0])
+        case (check){
+            0: out = 32b0
+            1: out = 32b1
+            default: out = 32b0
+        }
+    }
+}
